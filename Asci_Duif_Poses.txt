@@ -1,0 +1,80 @@
+Front Facing - Still:
+   .-.
+  /'v'\
+ (/   \)
+   - -
+Front Facing - Jump:
+   .-.
+  /'v'\
+ (/   \)
+   " "
+Front Facing - Right Feet Up
+   .-.
+  /'v'\
+ (/   \)
+   " -
+Front Facing - Left Feet Up
+   .-.
+  /'v'\
+ (/   \)
+   - "
+Right Facing - Still:
+   .-.
+  / 'c\
+ (/   )
+   - - 
+Right Facing - Jump:
+   .-.
+  / 'c\
+ (/   )
+   ` `
+Right Facing - Right Feet Up:
+   .-.
+  / 'c\
+ (/   )
+   ` -
+Right Facing - Left Feet Up
+   .-.
+  / 'c\
+ (/   )
+   - `
+Left Facing - Still:
+   .-.
+ /ↄ' \
+  (   \)
+   - -
+Left Facing - Jump:
+   .-.
+ /ↄ' \
+  (   \)
+   ` `
+Left Facing - Left Feet Up:
+   .-.
+ /ↄ' \
+  (   \)
+   - `
+Left Facing - Right Feet Up:
+   .-.
+ /ↄ' \
+  (   \)
+   ` -
+Back Facing - Still:
+   .-.
+  /   \
+ (/-+-\)
+   - -
+Back Facing - Jump:
+   .-.
+  /   \
+ (/-+-\)
+   " "
+Back Facing - Left Feet Up:
+   .-.
+  /   \
+ (/-+-\)
+   " -
+Back Facing - Right Feet Up:
+   .-.
+  /   \
+ (/-+-\)
+   - "
