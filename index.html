@@ -52,43 +52,57 @@
       pointer-events: none;
     }
 
-    /* WASD + spatiebalk toetsenbord (rechtsonder) */
-    #keyboard {
-      position: fixed;
-      bottom: 22px;
-      right: 24px;
-      display: grid;
-      grid-template-columns: repeat(3, 34px);
-      grid-template-rows: repeat(3, 34px);
-      gap: 3px;
-      opacity: 0.4;
-      transition: opacity 0.3s;
-    }
-    #keyboard:hover { opacity: 0.7; }
+    /* ── Mobiele knoppen ─────────────────────────────────────────────────────── */
 
-    .key {
+    /* D-pad (linksonder) */
+    #dpad {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 54px);
+      grid-template-rows: repeat(2, 54px);
+      gap: 5px;
+      touch-action: none;
+    }
+
+    .btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #333;
-      border-radius: 5px;
-      font-size: 12px;
-      font-family: 'Courier New', monospace;
-      color: #555;
-      background: #161616;
+      border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      font-size: 20px;
+      color: #4a4a4a;
+      background: rgba(14, 14, 14, 0.85);
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
       transition: background 0.08s, color 0.08s, border-color 0.08s;
     }
-    .key.active {
-      background: #252525;
-      color: #ccc;
-      border-color: #666;
+    .btn.active {
+      background: rgba(38, 38, 38, 0.95);
+      color: #bbb;
+      border-color: #5a5a5a;
     }
 
-    #key-w     { grid-column: 2;     grid-row: 1; }
-    #key-a     { grid-column: 1;     grid-row: 2; }
-    #key-s     { grid-column: 2;     grid-row: 2; }
-    #key-d     { grid-column: 3;     grid-row: 2; }
-    #key-space { grid-column: 1 / 4; grid-row: 3; font-size: 10px; letter-spacing: 1px; }
+    #btn-w { grid-column: 2; grid-row: 1; }
+    #btn-a { grid-column: 1; grid-row: 2; }
+    #btn-s { grid-column: 2; grid-row: 2; }
+    #btn-d { grid-column: 3; grid-row: 2; }
+
+    /* Sprongknop (rechtsonder, grote cirkel) */
+    #btn-jump {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      font-size: 26px;
+      touch-action: none;
+    }
 
     #title {
       position: fixed;
@@ -107,13 +121,16 @@
 <div id="shadow"></div>
 <div id="pigeon"></div>
 
-<div id="keyboard">
-  <div id="key-w" class="key">W</div>
-  <div id="key-a" class="key">A</div>
-  <div id="key-s" class="key">S</div>
-  <div id="key-d" class="key">D</div>
-  <div id="key-space" class="key">SPACE</div>
+<!-- D-pad (linksonder) -->
+<div id="dpad">
+  <button id="btn-w" class="btn">▲</button>
+  <button id="btn-a" class="btn">◀</button>
+  <button id="btn-s" class="btn">▼</button>
+  <button id="btn-d" class="btn">▶</button>
 </div>
+
+<!-- Sprongknop (rechtsonder) -->
+<button id="btn-jump" class="btn">↑</button>
 
 <script>
   // ─── ASCII poses ─────────────────────────────────────────────────────────────
@@ -210,7 +227,7 @@
       if (!jumping) {
         jumping      = true;
         jumpVelocity = CFG.jumpForce;
-        document.getElementById('key-space')?.classList.add('active');
+        document.getElementById('btn-jump')?.classList.add('active');
       }
       return;
     }
@@ -219,20 +236,55 @@
     e.preventDefault();
     if (!keys[k]) {
       keys[k] = true;
-      document.getElementById('key-' + k)?.classList.add('active');
+      document.getElementById('btn-' + k)?.classList.add('active');
     }
   });
 
   document.addEventListener('keyup', e => {
     if (e.key === ' ' || e.code === 'Space') {
-      document.getElementById('key-space')?.classList.remove('active');
+      document.getElementById('btn-jump')?.classList.remove('active');
       return;
     }
     const k = KEY_MAP[e.key];
     if (!k) return;
     keys[k] = false;
-    document.getElementById('key-' + k)?.classList.remove('active');
+    document.getElementById('btn-' + k)?.classList.remove('active');
   });
+
+  // ─── Knoppenbediening (pointer events: touch + muis) ─────────────────────────
+
+  function bindMoveBtn(el, keyName) {
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      keys[keyName] = true;
+      el.classList.add('active');
+    });
+    const release = () => {
+      keys[keyName] = false;
+      el.classList.remove('active');
+    };
+    el.addEventListener('pointerup',     release);
+    el.addEventListener('pointercancel', release);
+  }
+
+  bindMoveBtn(document.getElementById('btn-w'), 'w');
+  bindMoveBtn(document.getElementById('btn-a'), 'a');
+  bindMoveBtn(document.getElementById('btn-s'), 's');
+  bindMoveBtn(document.getElementById('btn-d'), 'd');
+
+  const jumpBtn = document.getElementById('btn-jump');
+  jumpBtn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    jumpBtn.setPointerCapture(e.pointerId);
+    if (!jumping) {
+      jumping      = true;
+      jumpVelocity = CFG.jumpForce;
+      jumpBtn.classList.add('active');
+    }
+  });
+  jumpBtn.addEventListener('pointerup',     () => jumpBtn.classList.remove('active'));
+  jumpBtn.addEventListener('pointercancel', () => jumpBtn.classList.remove('active'));
 
   // ─── DOM ─────────────────────────────────────────────────────────────────────
 
@@ -273,7 +325,7 @@
         jumpOffset   = 0;
         jumpVelocity = 0;
         jumping      = false;
-        document.getElementById('key-space')?.classList.remove('active');
+        document.getElementById('btn-jump')?.classList.remove('active');
       }
     }
 
