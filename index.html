@@ -1,31 +1,32 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AsciPigeon</title>
+  <title>DON'T EAT THE HASHTAG</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #0d0d0d;
+      background: #0a0a0a;
       width: 100vw;
       height: 100vh;
       overflow: hidden;
       font-family: 'Courier New', Courier, monospace;
     }
 
-    /* Subtiele bestrating */
     body::before {
       content: '';
       position: fixed;
       inset: 0;
       background-image:
-        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+        linear-gradient(rgba(255,255,255,0.011) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.011) 1px, transparent 1px);
       background-size: 40px 40px;
       pointer-events: none;
     }
+
+    /* ── Pigeon ─────────────────────────────────────────────────────────────── */
 
     #pigeon {
       position: absolute;
@@ -42,6 +43,22 @@
       will-change: left, top;
     }
 
+    /* RGB split overlays — visible only during glitch */
+    #pigeon-r, #pigeon-b {
+      position: absolute;
+      white-space: pre;
+      font-size: 16px;
+      line-height: 1.4;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      user-select: none;
+      display: none;
+      opacity: 0.65;
+      mix-blend-mode: screen;
+    }
+    #pigeon-r { color: #ff1f1f; }
+    #pigeon-b { color: #1ffff0; }
+
     #shadow {
       position: absolute;
       width: 34px;
@@ -52,9 +69,59 @@
       pointer-events: none;
     }
 
-    /* ── Mobiele knoppen ─────────────────────────────────────────────────────── */
+    /* ── Hashtag ─────────────────────────────────────────────────────────────── */
 
-    /* D-pad (linksonder) */
+    #hashtag {
+      position: absolute;
+      font-size: 30px;
+      font-family: 'Courier New', monospace;
+      color: rgba(228, 228, 228, 0.6);
+      text-shadow:
+        0 0 8px  rgba(228, 228, 228, 0.3),
+        0 0 32px rgba(228, 228, 228, 0.1);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      user-select: none;
+      animation: breathe 3.8s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.42; transform: translate(-50%, -50%) scale(1.00); }
+      50%       { opacity: 0.78; transform: translate(-50%, -50%) scale(1.06); }
+    }
+
+    /* ── Glitch overlays ────────────────────────────────────────────────────── */
+
+    #glitch-flash {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.05s;
+      z-index: 10;
+    }
+
+    /* ── Warning text ───────────────────────────────────────────────────────── */
+
+    #warning {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 5px;
+      color: rgba(210, 210, 210, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 0.4s;
+      z-index: 5;
+    }
+
+    /* ── Mobile controls ────────────────────────────────────────────────────── */
+
     #dpad {
       position: fixed;
       bottom: 20px;
@@ -64,6 +131,7 @@
       grid-template-rows: repeat(2, 54px);
       gap: 5px;
       touch-action: none;
+      z-index: 20;
     }
 
     .btn {
@@ -92,7 +160,6 @@
     #btn-s { grid-column: 2; grid-row: 2; }
     #btn-d { grid-column: 3; grid-row: 2; }
 
-    /* Sprongknop (rechtsonder, grote cirkel) */
     #btn-jump {
       position: fixed;
       bottom: 20px;
@@ -102,26 +169,21 @@
       border-radius: 50%;
       font-size: 26px;
       touch-action: none;
-    }
-
-    #title {
-      position: fixed;
-      top: 20px;
-      left: 24px;
-      font-size: 13px;
-      color: #2a2a2a;
-      letter-spacing: 3px;
-      pointer-events: none;
+      z-index: 20;
     }
   </style>
 </head>
 <body>
 
-<div id="title">ASCIPIGEON</div>
 <div id="shadow"></div>
 <div id="pigeon"></div>
+<div id="pigeon-r"></div>
+<div id="pigeon-b"></div>
+<div id="hashtag">#</div>
+<div id="glitch-flash"></div>
+<div id="warning"></div>
 
-<!-- D-pad (linksonder) -->
+<!-- D-pad (bottom-left) -->
 <div id="dpad">
   <button id="btn-w" class="btn">▲</button>
   <button id="btn-a" class="btn">◀</button>
@@ -129,25 +191,12 @@
   <button id="btn-d" class="btn">▶</button>
 </div>
 
-<!-- Sprongknop (rechtsonder) -->
+<!-- Jump (bottom-right) -->
 <button id="btn-jump" class="btn">↑</button>
 
 <script>
-  // ─── ASCII poses ─────────────────────────────────────────────────────────────
-  //
-  //  ASCII art door de gebruiker. 4 richtingen, elk 4 frames:
-  //  [stilstaand, rechterpoot omhoog, stilstaand, linkerpoot omhoog]
-  //
-  //  Richting → toets:
-  //    front (voorkant) → S
-  //    back  (rug)      → W
-  //    right (rechts)   → D
-  //    left  (links)    → A
-  //
-  //  Horizontale beweging (A/D) heeft prioriteit boven verticaal (W/S)
-  //  zodat de duif altijd links of rechts kijkt bij diagonaal lopen.
+  // ─── ASCII poses ──────────────────────────────────────────────────────────────
 
-  // Sprongpose per richting (beide poten omhoog)
   const JUMP_POSES = {
     front: "   .-. \n  /'v'\\\n (/   \\)\n   \" \" ",
     back:  "   .-. \n  /   \\\n (/-+-\\)\n   \" \" ",
@@ -157,13 +206,9 @@
 
   const POSES = {
     front: [
-      // 0 — stilstaand
       "   .-. \n  /'v'\\\n (/   \\)\n   - - ",
-      // 1 — rechterpoot omhoog
       "   .-. \n  /'v'\\\n (/   \\)\n   \" - ",
-      // 2 — stilstaand
       "   .-. \n  /'v'\\\n (/   \\)\n   - - ",
-      // 3 — linkerpoot omhoog
       "   .-. \n  /'v'\\\n (/   \\)\n   - \" ",
     ],
     back: [
@@ -186,17 +231,18 @@
     ],
   };
 
-  // ─── Config ──────────────────────────────────────────────────────────────────
+  // ─── Config ───────────────────────────────────────────────────────────────────
 
   const CFG = {
-    speed:      3.2,    // pixels per frame
-    walkFPS:    7,      // stapframes per seconde
-    margin:     56,     // rand (px)
-    jumpForce: -11,     // beginsnelheid sprong (px/frame, negatief = omhoog)
-    gravity:    0.75,   // zwaartekracht (px/frame²)
+    speed:      3.2,
+    walkFPS:    7,
+    margin:     56,
+    jumpForce: -11,
+    gravity:    0.75,
+    hitRadius:  38,
   };
 
-  // ─── State ───────────────────────────────────────────────────────────────────
+  // ─── State ────────────────────────────────────────────────────────────────────
 
   let x            = window.innerWidth  / 2;
   let y            = window.innerHeight / 2;
@@ -204,14 +250,97 @@
   let frameIndex   = 0;
   let lastWalkTime = 0;
 
-  // Sprong
   let jumping      = false;
   let jumpVelocity = 0;
-  let jumpOffset   = 0;   // pixels omhoog t.o.v. grond (negatief = in de lucht)
+  let jumpOffset   = 0;
 
   const keys = { w: false, a: false, s: false, d: false };
 
-  // ─── Toetsenbord ─────────────────────────────────────────────────────────────
+  // ─── Glitch + hashtag state ───────────────────────────────────────────────────
+
+  let hashX = 0, hashY = 0;
+  let glitchCount     = 0;
+  let glitching       = false;
+  let glitchIntensity = 0;
+
+  const pigeonEl  = document.getElementById('pigeon');
+  const pigeonR   = document.getElementById('pigeon-r');
+  const pigeonB   = document.getElementById('pigeon-b');
+  const shadowEl  = document.getElementById('shadow');
+  const hashEl    = document.getElementById('hashtag');
+  const flashEl   = document.getElementById('glitch-flash');
+  const warningEl = document.getElementById('warning');
+
+  const GLITCH_CHARS = '▓█░▒╬╪╫#@!|\\×≠⁺'.split('');
+
+  const WARNINGS = [
+    "DON'T DO IT AGAIN",
+    "DON'T DO IT AGAIN !!",
+    "I SAID DON'T",
+    ". . .",
+    "LAST WARNING",
+  ];
+
+  function corruptText(text) {
+    return text.split('').map(c => {
+      if (c === '\n' || c === ' ') return c;
+      return Math.random() < 0.45
+        ? GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]
+        : c;
+    }).join('');
+  }
+
+  function spawnHashtag() {
+    const m = 110;
+    hashX = m + Math.random() * (window.innerWidth  - m * 2);
+    hashY = m + Math.random() * (window.innerHeight - m * 2);
+    hashEl.style.left    = hashX + 'px';
+    hashEl.style.top     = hashY + 'px';
+    hashEl.style.display = 'block';
+  }
+
+  function showWarning() {
+    const idx = Math.min(glitchCount - 1, WARNINGS.length - 1);
+    warningEl.textContent = WARNINGS[idx];
+    warningEl.style.opacity = '0.55';
+  }
+
+  function triggerGlitch() {
+    if (glitching) return;
+    glitching = true;
+    glitchCount++;
+    glitchIntensity = Math.min(glitchCount, 6);
+
+    const duration = 300 + glitchIntensity * 30; // 330ms → 480ms
+
+    // Snap warning out
+    warningEl.style.transition = 'opacity 0.05s';
+    warningEl.style.opacity    = '0';
+    setTimeout(() => { warningEl.style.transition = 'opacity 0.4s'; }, 80);
+
+    // Hide hashtag instantly
+    hashEl.style.display = 'none';
+
+    // White flash — brighter each repetition
+    const flashStrength = Math.min(0.22 + glitchIntensity * 0.07, 0.65);
+    flashEl.style.opacity = String(flashStrength);
+    setTimeout(() => { flashEl.style.opacity = '0'; }, 50 + glitchIntensity * 5);
+
+    // Activate RGB overlays
+    pigeonR.style.display = 'block';
+    pigeonB.style.display = 'block';
+
+    // Resolve
+    setTimeout(() => {
+      glitching = false;
+      pigeonR.style.display = 'none';
+      pigeonB.style.display = 'none';
+      spawnHashtag();
+      setTimeout(showWarning, 200);
+    }, duration);
+  }
+
+  // ─── Keyboard ─────────────────────────────────────────────────────────────────
 
   const KEY_MAP = {
     w: 'w', W: 'w', ArrowUp:    'w',
@@ -221,7 +350,6 @@
   };
 
   document.addEventListener('keydown', e => {
-    // Spatiebalk → sprong
     if (e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
       if (!jumping) {
@@ -251,7 +379,7 @@
     document.getElementById('btn-' + k)?.classList.remove('active');
   });
 
-  // ─── Knoppenbediening (pointer events: touch + muis) ─────────────────────────
+  // ─── Button controls (pointer events: touch + mouse) ─────────────────────────
 
   function bindMoveBtn(el, keyName) {
     el.addEventListener('pointerdown', e => {
@@ -286,42 +414,33 @@
   jumpBtn.addEventListener('pointerup',     () => jumpBtn.classList.remove('active'));
   jumpBtn.addEventListener('pointercancel', () => jumpBtn.classList.remove('active'));
 
-  // ─── DOM ─────────────────────────────────────────────────────────────────────
-
-  const pigeonEl = document.getElementById('pigeon');
-  const shadowEl = document.getElementById('shadow');
-
-  // ─── Animatielus ─────────────────────────────────────────────────────────────
+  // ─── Animation loop ───────────────────────────────────────────────────────────
 
   function tick(timestamp) {
-    // Bewegingsvector
     let dx = 0, dy = 0;
     if (keys.w) dy -= CFG.speed;
     if (keys.s) dy += CFG.speed;
     if (keys.a) dx -= CFG.speed;
     if (keys.d) dx += CFG.speed;
 
-    // Diagonaal normaliseren
     if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
 
     const moving = dx !== 0 || dy !== 0;
 
-    // Richting: horizontaal heeft prioriteit
     if      (dx > 0) direction = 'right';
     else if (dx < 0) direction = 'left';
     else if (dy < 0) direction = 'back';
     else if (dy > 0) direction = 'front';
 
-    // Positie binnen venster houden
     const m = CFG.margin;
     x = Math.max(m, Math.min(window.innerWidth  - m, x + dx));
     y = Math.max(m, Math.min(window.innerHeight - m, y + dy));
 
-    // Sprong-fysica
+    // Jump physics
     if (jumping) {
       jumpVelocity += CFG.gravity;
       jumpOffset   += jumpVelocity;
-      if (jumpOffset >= 0) {           // landing
+      if (jumpOffset >= 0) {
         jumpOffset   = 0;
         jumpVelocity = 0;
         jumping      = false;
@@ -329,28 +448,53 @@
       }
     }
 
-    // Stapframe (alleen op de grond)
+    // Walk frame
     if (!jumping && moving && timestamp - lastWalkTime > 1000 / CFG.walkFPS) {
       frameIndex   = (frameIndex + 1) % 4;
       lastWalkTime = timestamp;
     }
     if (!moving && !jumping) frameIndex = 0;
 
-    // Pose kiezen
-    const pose = jumping
-      ? JUMP_POSES[direction]
-      : POSES[direction][frameIndex];
+    // Hashtag collision
+    if (!glitching && hashEl.style.display !== 'none') {
+      const ddx = x - hashX;
+      const ddy = y - hashY;
+      if (Math.sqrt(ddx * ddx + ddy * ddy) < CFG.hitRadius) {
+        triggerGlitch();
+      }
+    }
 
-    // Schaduw krimpt naarmate de duif hoger is
+    // Pose
+    let pose = jumping ? JUMP_POSES[direction] : POSES[direction][frameIndex];
+
+    // Glitch visuals — per-frame corruption + RGB split + jitter
+    let jitter = 0;
+    if (glitching) {
+      const i  = glitchIntensity;
+      jitter   = (Math.random() - 0.5) * i * 5;
+      const rgbOff = 3 + i * 1.6;
+      const rgbJ   = (Math.random() - 0.5) * i * 2.5;
+
+      pose = corruptText(pose);
+
+      pigeonR.textContent = pose;
+      pigeonB.textContent = pose;
+      pigeonR.style.left  = (x + jitter - rgbOff + rgbJ) + 'px';
+      pigeonR.style.top   = (y + jumpOffset) + 'px';
+      pigeonB.style.left  = (x + jitter + rgbOff + rgbJ) + 'px';
+      pigeonB.style.top   = (y + jumpOffset) + 'px';
+    }
+
+    // Shadow
     const shadowScale   = Math.max(0.25, 1 + jumpOffset / 90);
     const shadowOpacity = Math.max(0.15, 0.6 * shadowScale);
 
     pigeonEl.textContent = pose;
-    pigeonEl.style.left  = x + 'px';
-    pigeonEl.style.top   = (y + jumpOffset) + 'px';   // sprong offset hier
+    pigeonEl.style.left  = (x + jitter) + 'px';
+    pigeonEl.style.top   = (y + jumpOffset) + 'px';
 
     shadowEl.style.left      = x + 'px';
-    shadowEl.style.top       = (y + 42) + 'px';       // schaduw blijft op de grond
+    shadowEl.style.top       = (y + 42) + 'px';
     shadowEl.style.transform = `translate(-50%, -50%) scaleX(${shadowScale})`;
     shadowEl.style.opacity   = shadowOpacity;
 
@@ -362,6 +506,9 @@
     y = Math.min(y, window.innerHeight - CFG.margin);
   });
 
+  // ─── Boot ─────────────────────────────────────────────────────────────────────
+
+  spawnHashtag();
   requestAnimationFrame(tick);
 </script>
 
