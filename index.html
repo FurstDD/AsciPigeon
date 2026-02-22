@@ -15,7 +15,7 @@
       font-family: 'Courier New', Courier, monospace;
     }
 
-    /* Subtiele bestrating als achtergrond */
+    /* Subtiele bestrating */
     body::before {
       content: '';
       position: fixed;
@@ -27,12 +27,11 @@
       pointer-events: none;
     }
 
-    /* De duif */
     #pigeon {
       position: absolute;
       white-space: pre;
       font-size: 16px;
-      line-height: 1.35;
+      line-height: 1.4;
       color: #b0bec5;
       text-shadow:
         0 0 6px rgba(176, 190, 197, 0.25),
@@ -40,22 +39,20 @@
       transform: translate(-50%, -50%);
       pointer-events: none;
       user-select: none;
-      /* Smooth beweging via CSS transform — positie via JS */
       will-change: left, top;
     }
 
-    /* Schaduw op de grond */
     #shadow {
       position: absolute;
-      width: 32px;
+      width: 34px;
       height: 7px;
-      background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 72%);
+      background: radial-gradient(ellipse, rgba(0,0,0,0.6) 0%, transparent 72%);
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
     }
 
-    /* WASD toetsenbord UI rechtsonder */
+    /* WASD toetsenbord (rechtsonder) */
     #keyboard {
       position: fixed;
       bottom: 22px;
@@ -64,10 +61,9 @@
       grid-template-columns: repeat(3, 34px);
       grid-template-rows: repeat(2, 34px);
       gap: 3px;
-      opacity: 0.45;
+      opacity: 0.4;
       transition: opacity 0.3s;
     }
-
     #keyboard:hover { opacity: 0.7; }
 
     .key {
@@ -78,15 +74,14 @@
       border-radius: 5px;
       font-size: 12px;
       font-family: 'Courier New', monospace;
-      color: #666;
+      color: #555;
       background: #161616;
       transition: background 0.08s, color 0.08s, border-color 0.08s;
     }
-
     .key.active {
       background: #252525;
       color: #ccc;
-      border-color: #555;
+      border-color: #666;
     }
 
     #key-w { grid-column: 2; grid-row: 1; }
@@ -94,7 +89,6 @@
     #key-s { grid-column: 2; grid-row: 2; }
     #key-d { grid-column: 3; grid-row: 2; }
 
-    /* Titel linksboven */
     #title {
       position: fixed;
       top: 20px;
@@ -102,7 +96,6 @@
       font-size: 13px;
       color: #2a2a2a;
       letter-spacing: 3px;
-      font-family: 'Courier New', monospace;
       pointer-events: none;
     }
   </style>
@@ -110,11 +103,9 @@
 <body>
 
 <div id="title">ASCIPIGEON</div>
-
 <div id="shadow"></div>
 <div id="pigeon"></div>
 
-<!-- WASD visueel -->
 <div id="keyboard">
   <div id="key-w" class="key">W</div>
   <div id="key-a" class="key">A</div>
@@ -123,60 +114,70 @@
 </div>
 
 <script>
-  // ─── ASCII frames ────────────────────────────────────────────────────────────
+  // ─── ASCII poses ─────────────────────────────────────────────────────────────
   //
-  //  Duif in zijaanzicht:
+  //  ASCII art door de gebruiker. 4 richtingen, elk 4 frames:
+  //  [stilstaand, rechterpoot omhoog, stilstaand, linkerpoot omhoog]
   //
-  //    .-.       ← ronde kop
-  //   (o )>      ← oog, lichaam, snavel rechts
-  //    )=(       ← dikke romp / vleugels gevouwen
-  //    ^ ^       ← pootjes / klauwen
+  //  Richting → toets:
+  //    front (voorkant) → S
+  //    back  (rug)      → W
+  //    right (rechts)   → D
+  //    left  (links)    → A
   //
-  //  TODO: vervang deze strings door een echte sprite-afbeelding:
-  //    <img id="pigeon" src="pigeon-spritesheet.png">
-  //    Gebruik background-position om het juiste frame te tonen.
+  //  Horizontale beweging (A/D) heeft prioriteit boven verticaal (W/S)
+  //  zodat de duif altijd links of rechts kijkt bij diagonaal lopen.
 
-  const FRAMES = {
-    idle: {
-      right: '  .-. \n (o )>\n  )=( \n  ^ ^ ',
-      left:  '  .-. \n<( o) \n  )=( \n  ^ ^ ',
-    },
-    walk: {
-      right: [
-        '  .-. \n (o )>\n  )=( \n  ^ ^ ',   // 0 — beide poten neer
-        '  .-. \n (o )>\n  )=( \n  ^\\  ',   // 1 — rechterpoot op
-        '  .-. \n (o )>\n  )=( \n  ^ ^ ',   // 2 — beide poten neer
-        '  .-. \n (o )>\n  )=( \n  /^  ',   // 3 — linkerpoot op
-      ],
-      left: [
-        '  .-. \n<( o) \n  )=( \n  ^ ^ ',
-        '  .-. \n<( o) \n  )=( \n   /^ ',
-        '  .-. \n<( o) \n  )=( \n  ^ ^ ',
-        '  .-. \n<( o) \n  )=( \n  ^\\  ',
-      ],
-    },
+  const POSES = {
+    front: [
+      // 0 — stilstaand
+      "   .-. \n  /'v'\\\n (/   \\)\n   - - ",
+      // 1 — rechterpoot omhoog
+      "   .-. \n  /'v'\\\n (/   \\)\n   \" - ",
+      // 2 — stilstaand
+      "   .-. \n  /'v'\\\n (/   \\)\n   - - ",
+      // 3 — linkerpoot omhoog
+      "   .-. \n  /'v'\\\n (/   \\)\n   - \" ",
+    ],
+    back: [
+      "   .-. \n  /   \\\n (/-+-\\)\n   - - ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   - \" ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   - - ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   \" - ",
+    ],
+    right: [
+      "   .-. \n  / 'c\\\n (/   )\n   - - ",
+      "   .-. \n  / 'c\\\n (/   )\n   ` - ",
+      "   .-. \n  / 'c\\\n (/   )\n   - - ",
+      "   .-. \n  / 'c\\\n (/   )\n   - ` ",
+    ],
+    left: [
+      "   .-. \n /ↄ' \\ \n  (   \\)\n   - - ",
+      "   .-. \n /ↄ' \\ \n  (   \\)\n   ` - ",
+      "   .-. \n /ↄ' \\ \n  (   \\)\n   - - ",
+      "   .-. \n /ↄ' \\ \n  (   \\)\n   - ` ",
+    ],
   };
 
   // ─── Config ──────────────────────────────────────────────────────────────────
 
   const CFG = {
-    speed:   3.2,    // pixels per frame
-    walkFPS: 8,      // stapframes per seconde
-    margin:  48,     // rand zodat de duif niet van het scherm verdwijnt
+    speed:   3.2,   // pixels per frame
+    walkFPS: 7,     // stapframes per seconde
+    margin:  56,    // rand (px)
   };
 
   // ─── State ───────────────────────────────────────────────────────────────────
 
   let x            = window.innerWidth  / 2;
   let y            = window.innerHeight / 2;
-  let facingRight  = true;
+  let direction    = 'front';
   let frameIndex   = 0;
   let lastWalkTime = 0;
 
-  // Welke toetsen zijn ingedrukt?
   const keys = { w: false, a: false, s: false, d: false };
 
-  // ─── Toetsenbordbediening ────────────────────────────────────────────────────
+  // ─── Toetsenbord ─────────────────────────────────────────────────────────────
 
   const KEY_MAP = {
     w: 'w', W: 'w', ArrowUp:    'w',
@@ -202,59 +203,57 @@
     document.getElementById('key-' + k)?.classList.remove('active');
   });
 
-  // ─── DOM referenties ─────────────────────────────────────────────────────────
+  // ─── DOM ─────────────────────────────────────────────────────────────────────
 
   const pigeonEl = document.getElementById('pigeon');
   const shadowEl = document.getElementById('shadow');
 
-  // ─── Hoofdlus ────────────────────────────────────────────────────────────────
+  // ─── Animatielus ─────────────────────────────────────────────────────────────
 
   function tick(timestamp) {
-    // 1. Bewegingsvector berekenen
+    // Bewegingsvector
     let dx = 0, dy = 0;
     if (keys.w) dy -= CFG.speed;
     if (keys.s) dy += CFG.speed;
     if (keys.a) dx -= CFG.speed;
     if (keys.d) dx += CFG.speed;
 
-    // Diagonaal normaliseren (zodat je niet sneller gaat schuins)
+    // Diagonaal normaliseren
     if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
 
     const moving = dx !== 0 || dy !== 0;
 
-    // 2. Richting bijhouden (alleen updaten bij horizontale beweging)
-    if (dx > 0) facingRight = true;
-    if (dx < 0) facingRight = false;
+    // Richting: horizontaal heeft prioriteit
+    if      (dx > 0) direction = 'right';
+    else if (dx < 0) direction = 'left';
+    else if (dy < 0) direction = 'back';
+    else if (dy > 0) direction = 'front';
 
-    // 3. Positie bijwerken, binnen venster houden
-    const { margin } = CFG;
-    x = Math.max(margin, Math.min(window.innerWidth  - margin, x + dx));
-    y = Math.max(margin, Math.min(window.innerHeight - margin, y + dy));
+    // Positie binnen venster houden
+    const m = CFG.margin;
+    x = Math.max(m, Math.min(window.innerWidth  - m, x + dx));
+    y = Math.max(m, Math.min(window.innerHeight - m, y + dy));
 
-    // 4. Stapframe bijwerken
+    // Stapframe
     if (moving && timestamp - lastWalkTime > 1000 / CFG.walkFPS) {
-      frameIndex    = (frameIndex + 1) % FRAMES.walk.right.length;
-      lastWalkTime  = timestamp;
+      frameIndex   = (frameIndex + 1) % 4;
+      lastWalkTime = timestamp;
     }
     if (!moving) frameIndex = 0;
 
-    // 5. Juist frame kiezen
-    const dir   = facingRight ? 'right' : 'left';
-    const frame = moving ? FRAMES.walk[dir][frameIndex] : FRAMES.idle[dir];
+    // Pose kiezen (frame 0 = stilstaand)
+    const pose = POSES[direction][frameIndex];
 
-    // 6. Renderen
-    pigeonEl.textContent = frame;
+    pigeonEl.textContent = pose;
     pigeonEl.style.left  = x + 'px';
     pigeonEl.style.top   = y + 'px';
 
-    // Schaduw iets onder het midden van de duif
     shadowEl.style.left  = x + 'px';
-    shadowEl.style.top   = (y + 28) + 'px';
+    shadowEl.style.top   = (y + 42) + 'px';
 
     requestAnimationFrame(tick);
   }
 
-  // Venstergrootte bijhouden zodat de marge correct blijft bij resize
   window.addEventListener('resize', () => {
     x = Math.min(x, window.innerWidth  - CFG.margin);
     y = Math.min(y, window.innerHeight - CFG.margin);
