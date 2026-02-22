@@ -5,214 +5,260 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AsciPigeon</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #111;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      font-family: 'Courier New', Courier, monospace;
+      background: #0d0d0d;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
-      color: #eee;
+      font-family: 'Courier New', Courier, monospace;
     }
 
-    #scene {
-      position: relative;
-      width: 600px;
-      height: 600px;
-    }
-
-    /* Zichtbaar cirkelvormig pad */
-    #track {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 420px;
-      height: 420px;
-      border: 2px dashed #2a2a2a;
-      border-radius: 50%;
-    }
-
-    /* Midden tekst */
-    #center {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      color: #333;
-      line-height: 1.6;
+    /* Subtiele bestrating als achtergrond */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 40px 40px;
       pointer-events: none;
-      user-select: none;
     }
 
-    #center .title {
-      font-size: 22px;
-      letter-spacing: 4px;
-      color: #444;
-    }
-
-    #center .subtitle {
-      font-size: 11px;
-      color: #2a2a2a;
-      margin-top: 6px;
-      letter-spacing: 2px;
-    }
-
-    /* De kip container */
-    #chicken {
+    /* De duif */
+    #pigeon {
       position: absolute;
       white-space: pre;
-      font-size: 15px;
-      line-height: 1.3;
-      color: #e8c040;
-      text-shadow: 0 0 8px rgba(232, 192, 64, 0.4);
-      /* Ankerpunt in het midden van de kip */
+      font-size: 16px;
+      line-height: 1.35;
+      color: #b0bec5;
+      text-shadow:
+        0 0 6px rgba(176, 190, 197, 0.25),
+        0 0 20px rgba(176, 190, 197, 0.08);
       transform: translate(-50%, -50%);
       pointer-events: none;
       user-select: none;
+      /* Smooth beweging via CSS transform — positie via JS */
+      will-change: left, top;
     }
 
-    /*
-     * TODO: vervang de ASCII-art kip door een <img> sprite:
-     *   #chicken { display: block; width: 64px; height: 64px; }
-     *   gebruik background-image + background-position voor sprite sheets
-     */
-
-    /* Schaduw/voetafdruk onder de kip */
+    /* Schaduw op de grond */
     #shadow {
       position: absolute;
-      width: 28px;
-      height: 6px;
-      background: radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, transparent 70%);
+      width: 32px;
+      height: 7px;
+      background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 72%);
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
     }
 
-    /* Debug info (verberg in productie) */
-    #debug {
+    /* WASD toetsenbord UI rechtsonder */
+    #keyboard {
       position: fixed;
-      bottom: 16px;
-      left: 16px;
-      font-size: 10px;
+      bottom: 22px;
+      right: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 34px);
+      grid-template-rows: repeat(2, 34px);
+      gap: 3px;
+      opacity: 0.45;
+      transition: opacity 0.3s;
+    }
+
+    #keyboard:hover { opacity: 0.7; }
+
+    .key {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #333;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      color: #666;
+      background: #161616;
+      transition: background 0.08s, color 0.08s, border-color 0.08s;
+    }
+
+    .key.active {
+      background: #252525;
+      color: #ccc;
+      border-color: #555;
+    }
+
+    #key-w { grid-column: 2; grid-row: 1; }
+    #key-a { grid-column: 1; grid-row: 2; }
+    #key-s { grid-column: 2; grid-row: 2; }
+    #key-d { grid-column: 3; grid-row: 2; }
+
+    /* Titel linksboven */
+    #title {
+      position: fixed;
+      top: 20px;
+      left: 24px;
+      font-size: 13px;
       color: #2a2a2a;
-      font-family: monospace;
+      letter-spacing: 3px;
+      font-family: 'Courier New', monospace;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
 
-<div id="scene">
-  <div id="track"></div>
+<div id="title">ASCIPIGEON</div>
 
-  <div id="center">
-    <div class="title">AsciPigeon</div>
-    <div class="subtitle">cluck cluck</div>
-  </div>
+<div id="shadow"></div>
+<div id="pigeon"></div>
 
-  <div id="shadow"></div>
-  <div id="chicken"></div>
+<!-- WASD visueel -->
+<div id="keyboard">
+  <div id="key-w" class="key">W</div>
+  <div id="key-a" class="key">A</div>
+  <div id="key-s" class="key">S</div>
+  <div id="key-d" class="key">D</div>
 </div>
 
-<div id="debug"></div>
-
 <script>
-  // ─── Configuratie ────────────────────────────────────────────────────────────
-
-  const CONFIG = {
-    radius:      210,          // straal van het looppad (px)
-    speed:       0.008,        // radialen per frame (hoger = sneller)
-    walkFPS:     7,            // stapanimatie frames per seconde
-    centerX:     300,          // middelpunt van de scene (px)
-    centerY:     300,
-    showDebug:   false,
-  };
-
   // ─── ASCII frames ────────────────────────────────────────────────────────────
   //
-  //  Twee richtingen: rechts (>) en links (<).
-  //  Elke array bevat 4 loopframes.
+  //  Duif in zijaanzicht:
   //
-  //  TODO: vervang deze strings door een <img> met spritesheet frames.
+  //    .-.       ← ronde kop
+  //   (o )>      ← oog, lichaam, snavel rechts
+  //    )=(       ← dikke romp / vleugels gevouwen
+  //    ^ ^       ← pootjes / klauwen
+  //
+  //  TODO: vervang deze strings door een echte sprite-afbeelding:
+  //    <img id="pigeon" src="pigeon-spritesheet.png">
+  //    Gebruik background-position om het juiste frame te tonen.
 
   const FRAMES = {
-    right: [
-      // frame 0 — beide poten neer
-      '  __  \n>(oo) \n  ||\n  ^^ ',
-      // frame 1 — linkerpoot op
-      '  __  \n>(oo) \n  |\\ \n  ^  ',
-      // frame 2 — beide poten neer
-      '  __  \n>(oo) \n  ||\n  ^^ ',
-      // frame 3 — rechterpoot op
-      '  __  \n>(oo) \n  /| \n    ^',
-    ],
-    left: [
-      '  __  \n (oo)<\n  ||\n  ^^ ',
-      '  __  \n (oo)<\n  /| \n    ^',
-      '  __  \n (oo)<\n  ||\n  ^^ ',
-      '  __  \n (oo)<\n  |\\ \n  ^  ',
-    ],
+    idle: {
+      right: '  .-. \n (o )>\n  )=( \n  ^ ^ ',
+      left:  '  .-. \n<( o) \n  )=( \n  ^ ^ ',
+    },
+    walk: {
+      right: [
+        '  .-. \n (o )>\n  )=( \n  ^ ^ ',   // 0 — beide poten neer
+        '  .-. \n (o )>\n  )=( \n  ^\\  ',   // 1 — rechterpoot op
+        '  .-. \n (o )>\n  )=( \n  ^ ^ ',   // 2 — beide poten neer
+        '  .-. \n (o )>\n  )=( \n  /^  ',   // 3 — linkerpoot op
+      ],
+      left: [
+        '  .-. \n<( o) \n  )=( \n  ^ ^ ',
+        '  .-. \n<( o) \n  )=( \n   /^ ',
+        '  .-. \n<( o) \n  )=( \n  ^ ^ ',
+        '  .-. \n<( o) \n  )=( \n  ^\\  ',
+      ],
+    },
+  };
+
+  // ─── Config ──────────────────────────────────────────────────────────────────
+
+  const CFG = {
+    speed:   3.2,    // pixels per frame
+    walkFPS: 8,      // stapframes per seconde
+    margin:  48,     // rand zodat de duif niet van het scherm verdwijnt
   };
 
   // ─── State ───────────────────────────────────────────────────────────────────
 
-  let angle        = 0;           // huidige hoek in radialen
-  let frameIndex   = 0;           // huidige animatieframe
-  let lastWalkTime = 0;           // voor frame-timing
+  let x            = window.innerWidth  / 2;
+  let y            = window.innerHeight / 2;
+  let facingRight  = true;
+  let frameIndex   = 0;
+  let lastWalkTime = 0;
 
-  const chickenEl = document.getElementById('chicken');
-  const shadowEl  = document.getElementById('shadow');
-  const debugEl   = document.getElementById('debug');
+  // Welke toetsen zijn ingedrukt?
+  const keys = { w: false, a: false, s: false, d: false };
 
-  // ─── Animatielus ────────────────────────────────────────────────────────────
+  // ─── Toetsenbordbediening ────────────────────────────────────────────────────
+
+  const KEY_MAP = {
+    w: 'w', W: 'w', ArrowUp:    'w',
+    a: 'a', A: 'a', ArrowLeft:  'a',
+    s: 's', S: 's', ArrowDown:  's',
+    d: 'd', D: 'd', ArrowRight: 'd',
+  };
+
+  document.addEventListener('keydown', e => {
+    const k = KEY_MAP[e.key];
+    if (!k) return;
+    e.preventDefault();
+    if (!keys[k]) {
+      keys[k] = true;
+      document.getElementById('key-' + k)?.classList.add('active');
+    }
+  });
+
+  document.addEventListener('keyup', e => {
+    const k = KEY_MAP[e.key];
+    if (!k) return;
+    keys[k] = false;
+    document.getElementById('key-' + k)?.classList.remove('active');
+  });
+
+  // ─── DOM referenties ─────────────────────────────────────────────────────────
+
+  const pigeonEl = document.getElementById('pigeon');
+  const shadowEl = document.getElementById('shadow');
+
+  // ─── Hoofdlus ────────────────────────────────────────────────────────────────
 
   function tick(timestamp) {
-    // 1. Beweeg de kip langs de cirkel
-    angle += CONFIG.speed;
-    if (angle >= Math.PI * 2) angle -= Math.PI * 2;
+    // 1. Bewegingsvector berekenen
+    let dx = 0, dy = 0;
+    if (keys.w) dy -= CFG.speed;
+    if (keys.s) dy += CFG.speed;
+    if (keys.a) dx -= CFG.speed;
+    if (keys.d) dx += CFG.speed;
 
-    // 2. Bereken positie
-    const x = CONFIG.centerX + CONFIG.radius * Math.cos(angle);
-    const y = CONFIG.centerY + CONFIG.radius * Math.sin(angle);
+    // Diagonaal normaliseren (zodat je niet sneller gaat schuins)
+    if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
 
-    // 3. Bepaal looprichting
-    //    dx/dt = -R * sin(angle) → positief (naar rechts) als sin(angle) < 0
-    //    → sin(angle) < 0 wanneer angle ∈ (π, 2π)
-    const movingRight = angle > Math.PI;
+    const moving = dx !== 0 || dy !== 0;
 
-    // 4. Wissel stapframe op basis van tijd
-    if (timestamp - lastWalkTime > 1000 / CONFIG.walkFPS) {
-      frameIndex = (frameIndex + 1) % FRAMES.right.length;
-      lastWalkTime = timestamp;
+    // 2. Richting bijhouden (alleen updaten bij horizontale beweging)
+    if (dx > 0) facingRight = true;
+    if (dx < 0) facingRight = false;
+
+    // 3. Positie bijwerken, binnen venster houden
+    const { margin } = CFG;
+    x = Math.max(margin, Math.min(window.innerWidth  - margin, x + dx));
+    y = Math.max(margin, Math.min(window.innerHeight - margin, y + dy));
+
+    // 4. Stapframe bijwerken
+    if (moving && timestamp - lastWalkTime > 1000 / CFG.walkFPS) {
+      frameIndex    = (frameIndex + 1) % FRAMES.walk.right.length;
+      lastWalkTime  = timestamp;
     }
+    if (!moving) frameIndex = 0;
 
-    // 5. Render kip
-    const frames = movingRight ? FRAMES.right : FRAMES.left;
-    chickenEl.textContent = frames[frameIndex];
-    chickenEl.style.left  = x + 'px';
-    chickenEl.style.top   = y + 'px';
+    // 5. Juist frame kiezen
+    const dir   = facingRight ? 'right' : 'left';
+    const frame = moving ? FRAMES.walk[dir][frameIndex] : FRAMES.idle[dir];
 
-    // 6. Schaduw iets lager dan de kip
-    shadowEl.style.left = x + 'px';
-    shadowEl.style.top  = (y + 22) + 'px';
+    // 6. Renderen
+    pigeonEl.textContent = frame;
+    pigeonEl.style.left  = x + 'px';
+    pigeonEl.style.top   = y + 'px';
 
-    // 7. Debug
-    if (CONFIG.showDebug) {
-      const deg = ((angle * 180) / Math.PI).toFixed(1);
-      debugEl.textContent =
-        `angle: ${deg}° | dir: ${movingRight ? 'rechts' : 'links'} | frame: ${frameIndex}`;
-    }
+    // Schaduw iets onder het midden van de duif
+    shadowEl.style.left  = x + 'px';
+    shadowEl.style.top   = (y + 28) + 'px';
 
     requestAnimationFrame(tick);
   }
+
+  // Venstergrootte bijhouden zodat de marge correct blijft bij resize
+  window.addEventListener('resize', () => {
+    x = Math.min(x, window.innerWidth  - CFG.margin);
+    y = Math.min(y, window.innerHeight - CFG.margin);
+  });
 
   requestAnimationFrame(tick);
 </script>
