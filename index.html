@@ -52,14 +52,14 @@
       pointer-events: none;
     }
 
-    /* WASD toetsenbord (rechtsonder) */
+    /* WASD + spatiebalk toetsenbord (rechtsonder) */
     #keyboard {
       position: fixed;
       bottom: 22px;
       right: 24px;
       display: grid;
       grid-template-columns: repeat(3, 34px);
-      grid-template-rows: repeat(2, 34px);
+      grid-template-rows: repeat(3, 34px);
       gap: 3px;
       opacity: 0.4;
       transition: opacity 0.3s;
@@ -84,10 +84,11 @@
       border-color: #666;
     }
 
-    #key-w { grid-column: 2; grid-row: 1; }
-    #key-a { grid-column: 1; grid-row: 2; }
-    #key-s { grid-column: 2; grid-row: 2; }
-    #key-d { grid-column: 3; grid-row: 2; }
+    #key-w     { grid-column: 2;     grid-row: 1; }
+    #key-a     { grid-column: 1;     grid-row: 2; }
+    #key-s     { grid-column: 2;     grid-row: 2; }
+    #key-d     { grid-column: 3;     grid-row: 2; }
+    #key-space { grid-column: 1 / 4; grid-row: 3; font-size: 10px; letter-spacing: 1px; }
 
     #title {
       position: fixed;
@@ -111,6 +112,7 @@
   <div id="key-a" class="key">A</div>
   <div id="key-s" class="key">S</div>
   <div id="key-d" class="key">D</div>
+  <div id="key-space" class="key">SPACE</div>
 </div>
 
 <script>
@@ -127,6 +129,14 @@
   //
   //  Horizontale beweging (A/D) heeft prioriteit boven verticaal (W/S)
   //  zodat de duif altijd links of rechts kijkt bij diagonaal lopen.
+
+  // Sprongpose per richting (beide poten omhoog)
+  const JUMP_POSES = {
+    front: "   .-. \n  /'v'\\\n (/   \\)\n   \" \" ",
+    back:  "   .-. \n  /   \\\n (/-+-\\)\n   \" \" ",
+    right: "   .-. \n  / 'c\\\n (/   )\n   ` ` ",
+    left:  "   .-. \n /ↄ' \\ \n  (   \\)\n   ` ` ",
+  };
 
   const POSES = {
     front: [
@@ -162,9 +172,11 @@
   // ─── Config ──────────────────────────────────────────────────────────────────
 
   const CFG = {
-    speed:   3.2,   // pixels per frame
-    walkFPS: 7,     // stapframes per seconde
-    margin:  56,    // rand (px)
+    speed:      3.2,    // pixels per frame
+    walkFPS:    7,      // stapframes per seconde
+    margin:     56,     // rand (px)
+    jumpForce: -11,     // beginsnelheid sprong (px/frame, negatief = omhoog)
+    gravity:    0.75,   // zwaartekracht (px/frame²)
   };
 
   // ─── State ───────────────────────────────────────────────────────────────────
@@ -174,6 +186,11 @@
   let direction    = 'front';
   let frameIndex   = 0;
   let lastWalkTime = 0;
+
+  // Sprong
+  let jumping      = false;
+  let jumpVelocity = 0;
+  let jumpOffset   = 0;   // pixels omhoog t.o.v. grond (negatief = in de lucht)
 
   const keys = { w: false, a: false, s: false, d: false };
 
@@ -187,6 +204,16 @@
   };
 
   document.addEventListener('keydown', e => {
+    // Spatiebalk → sprong
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      if (!jumping) {
+        jumping      = true;
+        jumpVelocity = CFG.jumpForce;
+        document.getElementById('key-space')?.classList.add('active');
+      }
+      return;
+    }
     const k = KEY_MAP[e.key];
     if (!k) return;
     e.preventDefault();
@@ -197,6 +224,10 @@
   });
 
   document.addEventListener('keyup', e => {
+    if (e.key === ' ' || e.code === 'Space') {
+      document.getElementById('key-space')?.classList.remove('active');
+      return;
+    }
     const k = KEY_MAP[e.key];
     if (!k) return;
     keys[k] = false;
@@ -234,22 +265,42 @@
     x = Math.max(m, Math.min(window.innerWidth  - m, x + dx));
     y = Math.max(m, Math.min(window.innerHeight - m, y + dy));
 
-    // Stapframe
-    if (moving && timestamp - lastWalkTime > 1000 / CFG.walkFPS) {
+    // Sprong-fysica
+    if (jumping) {
+      jumpVelocity += CFG.gravity;
+      jumpOffset   += jumpVelocity;
+      if (jumpOffset >= 0) {           // landing
+        jumpOffset   = 0;
+        jumpVelocity = 0;
+        jumping      = false;
+        document.getElementById('key-space')?.classList.remove('active');
+      }
+    }
+
+    // Stapframe (alleen op de grond)
+    if (!jumping && moving && timestamp - lastWalkTime > 1000 / CFG.walkFPS) {
       frameIndex   = (frameIndex + 1) % 4;
       lastWalkTime = timestamp;
     }
-    if (!moving) frameIndex = 0;
+    if (!moving && !jumping) frameIndex = 0;
 
-    // Pose kiezen (frame 0 = stilstaand)
-    const pose = POSES[direction][frameIndex];
+    // Pose kiezen
+    const pose = jumping
+      ? JUMP_POSES[direction]
+      : POSES[direction][frameIndex];
+
+    // Schaduw krimpt naarmate de duif hoger is
+    const shadowScale   = Math.max(0.25, 1 + jumpOffset / 90);
+    const shadowOpacity = Math.max(0.15, 0.6 * shadowScale);
 
     pigeonEl.textContent = pose;
     pigeonEl.style.left  = x + 'px';
-    pigeonEl.style.top   = y + 'px';
+    pigeonEl.style.top   = (y + jumpOffset) + 'px';   // sprong offset hier
 
-    shadowEl.style.left  = x + 'px';
-    shadowEl.style.top   = (y + 42) + 'px';
+    shadowEl.style.left      = x + 'px';
+    shadowEl.style.top       = (y + 42) + 'px';       // schaduw blijft op de grond
+    shadowEl.style.transform = `translate(-50%, -50%) scaleX(${shadowScale})`;
+    shadowEl.style.opacity   = shadowOpacity;
 
     requestAnimationFrame(tick);
   }
