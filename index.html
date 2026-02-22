@@ -204,6 +204,14 @@
     left:  "   .-. \n /ↄ' \\ \n  (   \\)\n   ` ` ",
   };
 
+  // Angry variants — ˣ marks the red-glow spots
+  const ANGRY_JUMP_POSES = {
+    front: "   .-. \n  /ˣvˣ\\\n (/   \\)\n   \" \" ",
+    back:  "   .-. \n  /   \\\n (/-+-\\)\n   \" \" ",
+    right: "   .-. \n  / ˣc\\\n (/   )\n   ` ` ",
+    left:  "   .-. \n /ↄˣ \\ \n  (   \\)\n   ` ` ",
+  };
+
   const POSES = {
     front: [
       "   .-. \n  /'v'\\\n (/   \\)\n   - - ",
@@ -228,6 +236,33 @@
       "   .-. \n /ↄ' \\ \n  (   \\)\n   ` - ",
       "   .-. \n /ↄ' \\ \n  (   \\)\n   - - ",
       "   .-. \n /ↄ' \\ \n  (   \\)\n   - ` ",
+    ],
+  };
+
+  const ANGRY_POSES = {
+    front: [
+      "   .-. \n  /ˣvˣ\\\n (/   \\)\n   - - ",
+      "   .-. \n  /ˣvˣ\\\n (/   \\)\n   \" - ",
+      "   .-. \n  /ˣvˣ\\\n (/   \\)\n   - - ",
+      "   .-. \n  /ˣvˣ\\\n (/   \\)\n   - \" ",
+    ],
+    back: [
+      "   .-. \n  /   \\\n (/-+-\\)\n   - - ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   - \" ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   - - ",
+      "   .-. \n  /   \\\n (/-+-\\)\n   \" - ",
+    ],
+    right: [
+      "   .-. \n  / ˣc\\\n (/   )\n   - - ",
+      "   .-. \n  / ˣc\\\n (/   )\n   ` - ",
+      "   .-. \n  / ˣc\\\n (/   )\n   - - ",
+      "   .-. \n  / ˣc\\\n (/   )\n   - ` ",
+    ],
+    left: [
+      "   .-. \n /ↄˣ \\ \n  (   \\)\n   - - ",
+      "   .-. \n /ↄˣ \\ \n  (   \\)\n   ` - ",
+      "   .-. \n /ↄˣ \\ \n  (   \\)\n   - - ",
+      "   .-. \n /ↄˣ \\ \n  (   \\)\n   - ` ",
     ],
   };
 
@@ -342,18 +377,10 @@
   const EYE_OPEN  = '<span style="color:#ff1a1a;text-shadow:0 0 4px #ff0000,0 0 12px #cc0000,0 0 24px #880000">';
   const EYE_CLOSE = '</span>';
 
-  // Convert a pose string to innerHTML with glowing red eye spans.
-  // Only called when angryMode is true and not currently glitching.
-  function poseToHTML(pose, dir) {
-    // No HTML special chars in the poses, but escape to be safe.
-    let h = pose.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    switch (dir) {
-      case 'front': h = h.replace("'v'", `'${EYE_OPEN}v${EYE_CLOSE}'`);   break;
-      case 'right': h = h.replace("'c",  `'${EYE_OPEN}c${EYE_CLOSE}`);    break;
-      case 'left':  h = h.replace("ↄ'",  `${EYE_OPEN}ↄ${EYE_CLOSE}'`);   break;
-      // back: eyes not visible — no change
-    }
-    return h;
+  // ˣ is the explicit red-glow marker — replace every occurrence globally.
+  function poseToHTML(pose) {
+    const h = pose.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return h.replace(/ˣ/g, `${EYE_OPEN}ˣ${EYE_CLOSE}`);
   }
 
   function corruptText(text) {
@@ -544,8 +571,10 @@
       }
     }
 
-    // Pose
-    let pose = jumping ? JUMP_POSES[direction] : POSES[direction][frameIndex];
+    // Pose — switch to angry set after last warning
+    const poseSet = angryMode ? ANGRY_POSES      : POSES;
+    const jumpSet = angryMode ? ANGRY_JUMP_POSES : JUMP_POSES;
+    let pose = jumping ? jumpSet[direction] : poseSet[direction][frameIndex];
 
     // Glitch visuals — per-frame corruption + RGB split + jitter
     let jitter = 0;
@@ -570,7 +599,7 @@
     const shadowOpacity = Math.max(0.15, 0.6 * shadowScale);
 
     if (angryMode && !glitching) {
-      pigeonEl.innerHTML = poseToHTML(pose, direction);
+      pigeonEl.innerHTML = poseToHTML(pose);
     } else {
       pigeonEl.textContent = pose;
     }
