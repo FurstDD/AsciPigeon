@@ -273,6 +273,60 @@
 
   const GLITCH_CHARS = '▓█░▒╬╪╫#@!|\\×≠⁺'.split('');
 
+  // ─── Audio (Web Audio API — no external files) ────────────────────────────────
+
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playGlitchSound(intensity) {
+    try {
+      const ctx = getAudioCtx();
+      const i   = Math.min(intensity, 6);
+      const t   = ctx.currentTime;
+      const dur = 0.18 + i * 0.025;          // 205ms → 330ms
+
+      // ── Noise burst (harsh impact) ──────────────────────────────────────────
+      const bufLen = Math.floor(ctx.sampleRate * dur);
+      const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const data   = buf.getChannelData(0);
+      for (let j = 0; j < bufLen; j++) {
+        data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / bufLen, 0.35);
+      }
+      const noise     = ctx.createBufferSource();
+      noise.buffer    = buf;
+      const hpf       = ctx.createBiquadFilter();
+      hpf.type        = 'highpass';
+      hpf.frequency.value = 900 + i * 250;   // sharper each time
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.28 + i * 0.04, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      noise.connect(hpf);
+      hpf.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(t);
+      noise.stop(t + dur);
+
+      // ── Square sweep (digital error tone) ───────────────────────────────────
+      const osc     = ctx.createOscillator();
+      osc.type      = 'square';
+      osc.frequency.setValueAtTime(1200 + i * 180, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + dur * 0.7);
+      const oscGain = ctx.createGain();
+      oscGain.gain.setValueAtTime(0.12 + i * 0.015, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.65);
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + dur);
+
+    } catch (_) { /* audio not available — silent fallback */ }
+  }
+
   const WARNINGS = [
     "DON'T DO IT AGAIN",
     "DON'T DO IT AGAIN !!",
@@ -280,6 +334,27 @@
     ". . .",
     "LAST WARNING",
   ];
+
+  // ─── Angry eyes ───────────────────────────────────────────────────────────────
+
+  let angryMode = false;
+
+  const EYE_OPEN  = '<span style="color:#ff1a1a;text-shadow:0 0 4px #ff0000,0 0 12px #cc0000,0 0 24px #880000">';
+  const EYE_CLOSE = '</span>';
+
+  // Convert a pose string to innerHTML with glowing red eye spans.
+  // Only called when angryMode is true and not currently glitching.
+  function poseToHTML(pose, dir) {
+    // No HTML special chars in the poses, but escape to be safe.
+    let h = pose.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    switch (dir) {
+      case 'front': h = h.replace("'v'", `'${EYE_OPEN}v${EYE_CLOSE}'`);   break;
+      case 'right': h = h.replace("'c",  `'${EYE_OPEN}c${EYE_CLOSE}`);    break;
+      case 'left':  h = h.replace("ↄ'",  `${EYE_OPEN}ↄ${EYE_CLOSE}'`);   break;
+      // back: eyes not visible — no change
+    }
+    return h;
+  }
 
   function corruptText(text) {
     return text.split('').map(c => {
@@ -303,6 +378,8 @@
     const idx = Math.min(glitchCount - 1, WARNINGS.length - 1);
     warningEl.textContent = WARNINGS[idx];
     warningEl.style.opacity = '0.55';
+    // Eyes go red on "LAST WARNING" and stay red
+    if (glitchCount >= WARNINGS.length) angryMode = true;
   }
 
   function triggerGlitch() {
@@ -320,6 +397,9 @@
 
     // Hide hashtag instantly
     hashEl.style.display = 'none';
+
+    // Sound
+    playGlitchSound(glitchIntensity);
 
     // White flash — brighter each repetition
     const flashStrength = Math.min(0.22 + glitchIntensity * 0.07, 0.65);
@@ -489,7 +569,11 @@
     const shadowScale   = Math.max(0.25, 1 + jumpOffset / 90);
     const shadowOpacity = Math.max(0.15, 0.6 * shadowScale);
 
-    pigeonEl.textContent = pose;
+    if (angryMode && !glitching) {
+      pigeonEl.innerHTML = poseToHTML(pose, direction);
+    } else {
+      pigeonEl.textContent = pose;
+    }
     pigeonEl.style.left  = (x + jitter) + 'px';
     pigeonEl.style.top   = (y + jumpOffset) + 'px';
 
