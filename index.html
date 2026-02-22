@@ -26,7 +26,18 @@
       pointer-events: none;
     }
 
-    /* ── Pigeon ─────────────────────────────────────────────────────────────── */
+    /* ── Background glitch canvas ────────────────────────────────────────────── */
+
+    #bg-glitch {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 1.8s;
+    }
+
+    /* ── Pigeon ──────────────────────────────────────────────────────────────── */
 
     #pigeon {
       position: absolute;
@@ -41,9 +52,9 @@
       pointer-events: none;
       user-select: none;
       will-change: left, top;
+      z-index: 3;
     }
 
-    /* RGB split overlays — visible only during glitch */
     #pigeon-r, #pigeon-b {
       position: absolute;
       white-space: pre;
@@ -55,6 +66,7 @@
       display: none;
       opacity: 0.65;
       mix-blend-mode: screen;
+      z-index: 3;
     }
     #pigeon-r { color: #ff1f1f; }
     #pigeon-b { color: #1ffff0; }
@@ -67,9 +79,10 @@
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
+      z-index: 2;
     }
 
-    /* ── Hashtag ─────────────────────────────────────────────────────────────── */
+    /* ── Hashtag & choice objects ────────────────────────────────────────────── */
 
     #hashtag {
       position: absolute;
@@ -82,15 +95,31 @@
       transform: translate(-50%, -50%);
       pointer-events: none;
       user-select: none;
+      z-index: 3;
       animation: breathe 3.8s ease-in-out infinite;
+    }
+
+    .choice {
+      position: absolute;
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      letter-spacing: 2px;
+      color: rgba(210, 210, 210, 0.55);
+      text-shadow: 0 0 10px rgba(210, 210, 210, 0.2);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      user-select: none;
+      display: none;
+      z-index: 3;
+      animation: breathe 2.6s ease-in-out infinite;
     }
 
     @keyframes breathe {
       0%, 100% { opacity: 0.42; transform: translate(-50%, -50%) scale(1.00); }
-      50%       { opacity: 0.78; transform: translate(-50%, -50%) scale(1.06); }
+      50%       { opacity: 0.80; transform: translate(-50%, -50%) scale(1.06); }
     }
 
-    /* ── Glitch overlays ────────────────────────────────────────────────────── */
+    /* ── Glitch flash ────────────────────────────────────────────────────────── */
 
     #glitch-flash {
       position: fixed;
@@ -102,7 +131,7 @@
       z-index: 10;
     }
 
-    /* ── Warning text ───────────────────────────────────────────────────────── */
+    /* ── Warning / response text ─────────────────────────────────────────────── */
 
     #warning {
       position: fixed;
@@ -120,7 +149,46 @@
       z-index: 5;
     }
 
-    /* ── Mobile controls ────────────────────────────────────────────────────── */
+    /* ── Question text ───────────────────────────────────────────────────────── */
+
+    #question {
+      position: fixed;
+      top: 26%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 4px;
+      color: rgba(210, 210, 210, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      transition: opacity 0.6s;
+      z-index: 6;
+    }
+
+    /* ── Award popup ─────────────────────────────────────────────────────────── */
+
+    #award {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      letter-spacing: 1px;
+      color: rgba(220, 220, 220, 0.88);
+      white-space: pre;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.2s;
+      z-index: 30;
+      text-shadow: 0 0 20px rgba(220,220,220,0.12);
+    }
+
+    /* ── Mobile controls ─────────────────────────────────────────────────────── */
 
     #dpad {
       position: fixed;
@@ -175,13 +243,18 @@
 </head>
 <body>
 
+<canvas id="bg-glitch"></canvas>
 <div id="shadow"></div>
 <div id="pigeon"></div>
 <div id="pigeon-r"></div>
 <div id="pigeon-b"></div>
 <div id="hashtag">#</div>
+<div id="choice-yes" class="choice">[ YES ]</div>
+<div id="choice-no"  class="choice">[ NO ]</div>
 <div id="glitch-flash"></div>
 <div id="warning"></div>
+<div id="question">DO YOU REGRET YOUR ACTIONS?</div>
+<div id="award"></div>
 
 <!-- D-pad (bottom-left) -->
 <div id="dpad">
@@ -291,22 +364,102 @@
 
   const keys = { w: false, a: false, s: false, d: false };
 
-  // ─── Glitch + hashtag state ───────────────────────────────────────────────────
+  // ─── Game phase & question state ─────────────────────────────────────────────
+  //  'normal'   → regular play
+  //  'question' → choice screen (YES / NO / #)
+  //  'response' → answer shown
+  //  'final'    → award visible
+
+  let gamePhase     = 'normal';
+  let questionShown = false;
+  let yesX = 0, yesY = 0;
+  let noX  = 0, noY  = 0;
+
+  // ─── Glitch state ─────────────────────────────────────────────────────────────
 
   let hashX = 0, hashY = 0;
   let glitchCount     = 0;
   let glitching       = false;
   let glitchIntensity = 0;
 
-  const pigeonEl  = document.getElementById('pigeon');
-  const pigeonR   = document.getElementById('pigeon-r');
-  const pigeonB   = document.getElementById('pigeon-b');
-  const shadowEl  = document.getElementById('shadow');
-  const hashEl    = document.getElementById('hashtag');
-  const flashEl   = document.getElementById('glitch-flash');
-  const warningEl = document.getElementById('warning');
+  // ─── DOM refs ─────────────────────────────────────────────────────────────────
+
+  const pigeonEl   = document.getElementById('pigeon');
+  const pigeonR    = document.getElementById('pigeon-r');
+  const pigeonB    = document.getElementById('pigeon-b');
+  const shadowEl   = document.getElementById('shadow');
+  const hashEl     = document.getElementById('hashtag');
+  const flashEl    = document.getElementById('glitch-flash');
+  const warningEl  = document.getElementById('warning');
+  const questionEl = document.getElementById('question');
+  const yesEl      = document.getElementById('choice-yes');
+  const noEl       = document.getElementById('choice-no');
+  const awardEl    = document.getElementById('award');
+  const bgCanvas   = document.getElementById('bg-glitch');
+  const bgCtx      = bgCanvas.getContext('2d');
+
+  // ─── Strings ──────────────────────────────────────────────────────────────────
 
   const GLITCH_CHARS = '▓█░▒╬╪╫#@!|\\×≠⁺'.split('');
+
+  const WARNINGS = [
+    "DON'T DO IT AGAIN",
+    "DON'T DO IT AGAIN !!",
+    "I SAID DON'T",
+    ". . .",
+    "LAST WARNING",
+  ];
+
+  const YES_RESPONSES = [
+    "REGRET DOES NOT RESTORE FAILURE.",
+    "TOO LATE.",
+    "EXPECTED.",
+    "WEAK.",
+  ];
+
+  const NO_RESPONSES = [
+    "YOU HAVE DISAPPOINTED ME.",
+    "THAT WAS A TERRIBLE DECISION.",
+    "EXISTENCE REVOKED.",
+    "SYSTEM NO LONGER RECOGNIZES YOU.",
+    "YOU WERE NOT MEANT TO SURVIVE.",
+    "UNFORTUNATE.",
+    "TRY AGAIN, PIGEON.",
+    "WELL\u2026 THAT HAPPENED.",
+    "PIGEON.EXE HAS STOPPED WORKING.",
+    "404: PIGEON NOT FOUND.",
+    "YOU HAD ONE JOB.",
+    "IMPRESSIVELY BAD.",
+    "WHY DID YOU DO THAT?",
+    "DO YOU EVER LEARN?",
+  ];
+
+  const HASH_RESPONSES = [
+    "OF COURSE YOU DID.",
+    "PREDICTABLE.",
+    "YOU NEVER LEARN.",
+    "DISAPPOINTING.",
+    "IT WAS CLEARLY A TRAP.",
+    "IMPULSE CONTROL: FAILED.",
+    "YOU SAW THAT COMING.",
+    "BAD PIGEON.",
+    "AGAIN?",
+    "WHY THE HASHTAG.",
+    "CURIOUS...",
+    "NOTED.",
+    "INTERESTING CHOICE.",
+  ];
+
+  const AWARD_TEXT =
+    "╔══════════════════════╗\n" +
+    "║                      ║\n" +
+    "║        AWARD         ║\n" +
+    "║                      ║\n" +
+    "║    POOR DECISION     ║\n" +
+    "║                      ║\n" +
+    "║  DE DUIFEL APPROVES  ║\n" +
+    "║                      ║\n" +
+    "╚══════════════════════╝";
 
   // ─── Audio (Web Audio API — no external files) ────────────────────────────────
 
@@ -323,9 +476,8 @@
       const ctx = getAudioCtx();
       const i   = Math.min(intensity, 6);
       const t   = ctx.currentTime;
-      const dur = 0.18 + i * 0.025;          // 205ms → 330ms
+      const dur = 0.18 + i * 0.025;
 
-      // ── Noise burst (harsh impact) ──────────────────────────────────────────
       const bufLen = Math.floor(ctx.sampleRate * dur);
       const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
       const data   = buf.getChannelData(0);
@@ -336,7 +488,7 @@
       noise.buffer    = buf;
       const hpf       = ctx.createBiquadFilter();
       hpf.type        = 'highpass';
-      hpf.frequency.value = 900 + i * 250;   // sharper each time
+      hpf.frequency.value = 900 + i * 250;
       const noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.28 + i * 0.04, t);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, t + dur);
@@ -346,7 +498,6 @@
       noise.start(t);
       noise.stop(t + dur);
 
-      // ── Square sweep (digital error tone) ───────────────────────────────────
       const osc     = ctx.createOscillator();
       osc.type      = 'square';
       osc.frequency.setValueAtTime(1200 + i * 180, t);
@@ -359,16 +510,8 @@
       osc.start(t);
       osc.stop(t + dur);
 
-    } catch (_) { /* audio not available — silent fallback */ }
+    } catch (_) { /* audio not available */ }
   }
-
-  const WARNINGS = [
-    "DON'T DO IT AGAIN",
-    "DON'T DO IT AGAIN !!",
-    "I SAID DON'T",
-    ". . .",
-    "LAST WARNING",
-  ];
 
   // ─── Angry eyes ───────────────────────────────────────────────────────────────
 
@@ -377,11 +520,49 @@
   const EYE_OPEN  = '<span style="color:#ff1a1a;text-shadow:0 0 4px #ff0000,0 0 12px #cc0000,0 0 24px #880000">';
   const EYE_CLOSE = '</span>';
 
-  // ˣ is the explicit red-glow marker — replace every occurrence globally.
   function poseToHTML(pose) {
     const h = pose.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return h.replace(/ˣ/g, `${EYE_OPEN}ˣ${EYE_CLOSE}`);
   }
+
+  // ─── Background glitch ────────────────────────────────────────────────────────
+
+  let bgGlitchInterval = null;
+  const BG_COLORS = ['#ff2020', '#20ffee', '#ff00cc', '#ffe020', '#ffffff'];
+
+  function startBgGlitch() {
+    if (bgGlitchInterval) return;
+    bgCanvas.width  = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+    bgCanvas.style.opacity = '1';
+    bgGlitchInterval = setInterval(drawBgGlitch, 130);
+  }
+
+  function drawBgGlitch() {
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    const count = 10 + glitchIntensity * 4;
+    for (let i = 0; i < count; i++) {
+      bgCtx.globalAlpha = 0.03 + Math.random() * 0.09;
+      bgCtx.fillStyle   = BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)];
+      bgCtx.font        = `${8 + Math.floor(Math.random() * 10)}px Courier New, monospace`;
+      bgCtx.fillText(
+        GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)],
+        Math.random() * bgCanvas.width,
+        Math.random() * bgCanvas.height,
+      );
+    }
+    bgCtx.globalAlpha = 1;
+  }
+
+  function stopBgGlitch() {
+    if (!bgGlitchInterval) return;
+    clearInterval(bgGlitchInterval);
+    bgGlitchInterval = null;
+    bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+    bgCanvas.style.opacity = '0';
+  }
+
+  // ─── Text corruption ──────────────────────────────────────────────────────────
 
   function corruptText(text) {
     return text.split('').map(c => {
@@ -392,59 +573,167 @@
     }).join('');
   }
 
+  // ─── Hashtag spawning ─────────────────────────────────────────────────────────
+
   function spawnHashtag() {
     const m = 110;
     hashX = m + Math.random() * (window.innerWidth  - m * 2);
     hashY = m + Math.random() * (window.innerHeight - m * 2);
-    hashEl.style.left    = hashX + 'px';
-    hashEl.style.top     = hashY + 'px';
-    hashEl.style.display = 'block';
+    hashEl.style.left      = hashX + 'px';
+    hashEl.style.top       = hashY + 'px';
+    hashEl.style.display   = 'block';
+    hashEl.style.animation = '';           // restore breathe animation
+    hashEl.textContent     = '#';
   }
+
+  // ─── Warning display ──────────────────────────────────────────────────────────
 
   function showWarning() {
     const idx = Math.min(glitchCount - 1, WARNINGS.length - 1);
     warningEl.textContent = WARNINGS[idx];
     warningEl.style.opacity = '0.55';
-    // Eyes go red on "LAST WARNING" and stay red
-    if (glitchCount >= WARNINGS.length) angryMode = true;
+    if (glitchCount >= WARNINGS.length) {
+      angryMode = true;
+      startBgGlitch();
+    }
   }
 
-  function triggerGlitch() {
-    if (glitching) return;
+  // ─── Mini glitch burst (visual + audio only, no state change) ────────────────
+
+  function triggerMiniGlitch(callback) {
+    if (glitching) { if (callback) setTimeout(callback, 350); return; }
     glitching = true;
-    glitchCount++;
-    glitchIntensity = Math.min(glitchCount, 6);
-
-    const duration = 300 + glitchIntensity * 30; // 330ms → 480ms
-
-    // Snap warning out
-    warningEl.style.transition = 'opacity 0.05s';
-    warningEl.style.opacity    = '0';
-    setTimeout(() => { warningEl.style.transition = 'opacity 0.4s'; }, 80);
-
-    // Hide hashtag instantly
-    hashEl.style.display = 'none';
-
-    // Sound
     playGlitchSound(glitchIntensity);
 
-    // White flash — brighter each repetition
-    const flashStrength = Math.min(0.22 + glitchIntensity * 0.07, 0.65);
-    flashEl.style.opacity = String(flashStrength);
-    setTimeout(() => { flashEl.style.opacity = '0'; }, 50 + glitchIntensity * 5);
+    flashEl.style.opacity = String(Math.min(0.35 + glitchIntensity * 0.05, 0.65));
+    setTimeout(() => { flashEl.style.opacity = '0'; }, 60);
 
-    // Activate RGB overlays
     pigeonR.style.display = 'block';
     pigeonB.style.display = 'block';
 
-    // Resolve
     setTimeout(() => {
       glitching = false;
       pigeonR.style.display = 'none';
       pigeonB.style.display = 'none';
-      spawnHashtag();
-      setTimeout(showWarning, 200);
+      if (callback) callback();
+    }, 340);
+  }
+
+  // ─── Full glitch (game state glitch) ─────────────────────────────────────────
+
+  function triggerGlitch() {
+    if (glitching || gamePhase !== 'normal') return;
+    glitching = true;
+    glitchCount++;
+    glitchIntensity = Math.min(glitchCount, 6);
+
+    const duration = 300 + glitchIntensity * 30;
+
+    warningEl.style.transition = 'opacity 0.05s';
+    warningEl.style.opacity    = '0';
+    setTimeout(() => { warningEl.style.transition = 'opacity 0.4s'; }, 80);
+
+    hashEl.style.display = 'none';
+
+    playGlitchSound(glitchIntensity);
+
+    const flashStr = Math.min(0.22 + glitchIntensity * 0.07, 0.65);
+    flashEl.style.opacity = String(flashStr);
+    setTimeout(() => { flashEl.style.opacity = '0'; }, 50 + glitchIntensity * 5);
+
+    pigeonR.style.display = 'block';
+    pigeonB.style.display = 'block';
+
+    setTimeout(() => {
+      glitching = false;
+      pigeonR.style.display = 'none';
+      pigeonB.style.display = 'none';
+
+      // After LAST WARNING: show question once on the next eat
+      if (angryMode && !questionShown) {
+        questionShown = true;
+        gamePhase = 'question';
+        setTimeout(spawnQuestion, 400);
+      } else {
+        spawnHashtag();
+        setTimeout(showWarning, 200);
+      }
     }, duration);
+  }
+
+  // ─── Question / choice screen ─────────────────────────────────────────────────
+
+  function spawnQuestion() {
+    // Spawn # at a fresh random position
+    spawnHashtag();
+
+    // Show question text
+    questionEl.style.opacity = '1';
+
+    // Position YES and NO flanking the hashtag
+    const spacing = Math.min(130, window.innerWidth * 0.18);
+    yesX = Math.max(80, hashX - spacing);
+    yesY = hashY;
+    noX  = Math.min(window.innerWidth - 80, hashX + spacing);
+    noY  = hashY;
+
+    yesEl.style.left    = yesX + 'px';
+    yesEl.style.top     = yesY + 'px';
+    yesEl.style.display = 'block';
+
+    noEl.style.left    = noX + 'px';
+    noEl.style.top     = noY + 'px';
+    noEl.style.display = 'block';
+  }
+
+  // ─── Answer handling ──────────────────────────────────────────────────────────
+
+  function handleAnswer(choice) {
+    if (gamePhase !== 'question') return;
+    gamePhase = 'response';
+
+    // Hide all interactive elements
+    questionEl.style.opacity = '0';
+    yesEl.style.display      = 'none';
+    noEl.style.display       = 'none';
+    hashEl.style.display     = 'none';
+    warningEl.style.opacity  = '0';
+
+    const pool = choice === 'yes' ? YES_RESPONSES
+               : choice === 'no'  ? NO_RESPONSES
+               :                    HASH_RESPONSES;
+    const msg = pool[Math.floor(Math.random() * pool.length)];
+
+    // Glitch burst, then reveal response
+    triggerMiniGlitch(() => {
+      warningEl.textContent   = msg;
+      warningEl.style.opacity = '0.75';
+
+      // After reading time → show [=] dead symbol
+      setTimeout(() => {
+        hashEl.textContent     = '[=]';
+        hashEl.style.animation = 'none';
+        hashEl.style.opacity   = '0.35';
+        hashEl.style.display   = 'block';
+        hashEl.style.left      = (window.innerWidth  / 2) + 'px';
+        hashEl.style.top       = (window.innerHeight * 0.72) + 'px';
+
+        // Then show award
+        setTimeout(() => {
+          gamePhase = 'final';
+          showAward();
+        }, 1800);
+      }, 2000);
+    });
+  }
+
+  // ─── Award ────────────────────────────────────────────────────────────────────
+
+  function showAward() {
+    stopBgGlitch();
+    warningEl.style.opacity = '0';
+    awardEl.textContent     = AWARD_TEXT;
+    awardEl.style.opacity   = '1';
   }
 
   // ─── Keyboard ─────────────────────────────────────────────────────────────────
@@ -562,25 +851,40 @@
     }
     if (!moving && !jumping) frameIndex = 0;
 
-    // Hashtag collision
-    if (!glitching && hashEl.style.display !== 'none') {
-      const ddx = x - hashX;
-      const ddy = y - hashY;
-      if (Math.sqrt(ddx * ddx + ddy * ddy) < CFG.hitRadius) {
-        triggerGlitch();
+    // ── Collision detection (phase-aware) ────────────────────────────────────
+    if (!glitching) {
+      if (gamePhase === 'normal' && hashEl.style.display !== 'none') {
+        const ddx = x - hashX, ddy = y - hashY;
+        if (Math.sqrt(ddx * ddx + ddy * ddy) < CFG.hitRadius) {
+          triggerGlitch();
+        }
+      } else if (gamePhase === 'question') {
+        const bigR = CFG.hitRadius * 1.8;
+        if (yesEl.style.display !== 'none') {
+          const ddx = x - yesX, ddy = y - yesY;
+          if (Math.sqrt(ddx * ddx + ddy * ddy) < bigR) handleAnswer('yes');
+        }
+        if (noEl.style.display !== 'none') {
+          const ddx = x - noX, ddy = y - noY;
+          if (Math.sqrt(ddx * ddx + ddy * ddy) < bigR) handleAnswer('no');
+        }
+        if (hashEl.style.display !== 'none') {
+          const ddx = x - hashX, ddy = y - hashY;
+          if (Math.sqrt(ddx * ddx + ddy * ddy) < CFG.hitRadius) handleAnswer('hash');
+        }
       }
     }
 
-    // Pose — switch to angry set after last warning
+    // ── Pose ─────────────────────────────────────────────────────────────────
     const poseSet = angryMode ? ANGRY_POSES      : POSES;
     const jumpSet = angryMode ? ANGRY_JUMP_POSES : JUMP_POSES;
     let pose = jumping ? jumpSet[direction] : poseSet[direction][frameIndex];
 
-    // Glitch visuals — per-frame corruption + RGB split + jitter
+    // ── Glitch visuals ───────────────────────────────────────────────────────
     let jitter = 0;
     if (glitching) {
-      const i  = glitchIntensity;
-      jitter   = (Math.random() - 0.5) * i * 5;
+      const i      = glitchIntensity;
+      jitter       = (Math.random() - 0.5) * i * 5;
       const rgbOff = 3 + i * 1.6;
       const rgbJ   = (Math.random() - 0.5) * i * 2.5;
 
@@ -594,7 +898,7 @@
       pigeonB.style.top   = (y + jumpOffset) + 'px';
     }
 
-    // Shadow
+    // ── Shadow ───────────────────────────────────────────────────────────────
     const shadowScale   = Math.max(0.25, 1 + jumpOffset / 90);
     const shadowOpacity = Math.max(0.15, 0.6 * shadowScale);
 
@@ -617,6 +921,8 @@
   window.addEventListener('resize', () => {
     x = Math.min(x, window.innerWidth  - CFG.margin);
     y = Math.min(y, window.innerHeight - CFG.margin);
+    bgCanvas.width  = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
   });
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────
